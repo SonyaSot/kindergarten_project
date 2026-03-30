@@ -6,7 +6,11 @@ COPY requirements.txt .
 
 # Увеличиваем тайм-аут и используем кэш
 RUN pip install --no-cache-dir \
-    --default-timeout=100 \
+    --default-timeout=1000 \
+    --retries 5 \
+    --trusted-host pypi.org \
+    --trusted-host files.pythonhosted.org \
+    --trusted-host pypi.python.org \
     -r requirements.txt
 
 COPY . .

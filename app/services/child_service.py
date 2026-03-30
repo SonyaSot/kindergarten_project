@@ -3,15 +3,15 @@ from app.repositories.child_repository import ChildRepository
 from app.models import Child
 from app.schemas.child import ChildCreate
 
+# Сервис для работы с детьми - паттерн Service Layer
 class ChildService:
-    """Сервис для работы с детьми - паттерн Service Layer"""
     
     def __init__(self, db: Session):
         self.db = db
         self.repository = ChildRepository(db)
     
-    def create_child(self, child_data: ChildCreate) -> Child:
-        """Бизнес-логика создания ребенка"""
+    # Бизнес-логика создания ребенка
+    def create_child(self, child_data: ChildCreate) -> Child:   
         # Валидация
         if not child_data.full_name:
             raise ValueError("Имя ребенка обязательно")
@@ -31,11 +31,18 @@ class ChildService:
             "discount_reason": child_data.discount_reason,
             "is_active": True
         })
+
+    #  Получить всех детей (для админа)
+    def get_all_children(self):
+        """Получить всех детей из всех групп"""
+        return self.repository.get_all()
     
+    # Бизнес-логика: получить детей группы    
     def get_children_by_group(self, group_id: int):
-        """Бизнес-логика: получить детей группы"""
+        """Получить детей конкретной группы"""
         return self.repository.get_by_group(group_id)
     
+    # Бизнес-логика: получить детей со скидкой
     def get_discount_children(self):
-        """Бизнес-логика: получить детей со скидкой"""
+        """Получить детей со скидкой"""
         return self.repository.get_with_discount()

@@ -1,11 +1,33 @@
-# Environment variables
-.env
-
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+env/
+.venv/
 
-# Database
+# Environment
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database (если есть локальные файлы)
 *.db
 *.sqlite3
+
+# AI Model (опционально - можно загрузить отдельно)
+app/ai_module/xgb_model.json

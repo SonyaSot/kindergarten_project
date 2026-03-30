@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Date, Float, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Date, Float, Text, func
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 import enum
@@ -29,7 +29,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # ✅ Отношения (обрати внимание на back_populates)
+    # Отношения (обрати внимание на back_populates)
     groups_as_teacher = relationship("Group", foreign_keys="Group.teacher_id", back_populates="teacher")
     attendance_records = relationship("Attendance", back_populates="teacher")
 
@@ -46,7 +46,7 @@ class Group(Base):
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # ✅ Отношения
+    # Отношения
     teacher = relationship("User", foreign_keys=[teacher_id], back_populates="groups_as_teacher")
     children = relationship("Child", back_populates="group")
 
@@ -68,7 +68,7 @@ class Child(Base):
     discount_reason = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
 
-    # ✅ Отношения
+    # Отношения
     group = relationship("Group", back_populates="children")
     attendance_records = relationship("Attendance", back_populates="child")
     payments = relationship("Payment", back_populates="child")
@@ -115,3 +115,23 @@ class Payment(Base):
 
     def __repr__(self):
         return f"<Payment {self.child_id} - {self.month} - {self.amount}>"
+
+ # === Журнал действий пользователей  ===
+class AuditLog(Base):
+   
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(50), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, LOGOUT
+    resource = Column(String(50))  # children, groups, payments, users
+    resource_id = Column(Integer, nullable=True)  # ID затронутого объекта
+    details = Column(String(500), nullable=True)  # Дополнительные данные
+    ip_address = Column(String(50), nullable=True)  # IP адрес клиента
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Связь с пользователем
+    user = relationship("User", backref="audit_logs")
+    
+    def __repr__(self):
+        return f"<AuditLog(id={self.id}, user_id={self.user_id}, action={self.action})>"

@@ -24,7 +24,7 @@ class RiskAlert(BaseModel):
     risk_type: str  # "frequent_absence", "illness_pattern", "payment_issue"
     risk_score: float
     recommendation: str
-    historical_data: Dict  # ← ИСПРАВЛЕНО: было historical_ Dict
+    historical_data: Dict  
 
 class AIPredictionResponse(BaseModel):
     predictions: List[AttendancePrediction]

@@ -4,22 +4,23 @@ from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 from app.models import Attendance, Child, Payment, AttendanceStatus
 
+# модель для прогнозирования посещаемости
 class AttendancePredictor:
-    """ML модель для прогнозирования посещаемости"""
-    
+        
     def __init__(self):
         self.seasonal_weights = {
             1: 0.7, 2: 0.75, 3: 0.8, 4: 0.85, 5: 0.82, 6: 0.7,
             7: 0.65, 8: 0.6, 9: 0.85, 10: 0.8, 11: 0.75, 12: 0.7,
         }
     
+    #Расчет исторической посещаемости
     def calculate_historical_attendance(
         self, 
         child_id: int, 
         db: Session,
         months_back: int = 6
     ) -> Tuple[float, Dict]:
-        """Расчет исторической посещаемости"""
+        
         end_date = datetime.utcnow().date()
         start_date = end_date - timedelta(days=months_back * 30)
         
@@ -46,13 +47,14 @@ class AttendancePredictor:
         
         return attendance_rate, patterns
     
+    #Прогноз посещаемости на следующий месяц
     def predict_next_month(
         self,
         child_id: int,
         db: Session,
         target_month: date
     ) -> Dict:
-        """Прогноз посещаемости на следующий месяц"""
+        
         base_rate, patterns = self.calculate_historical_attendance(child_id, db)
         seasonal_factor = self.seasonal_weights.get(target_month.month, 0.8)
         predicted_rate = base_rate * 0.7 + seasonal_factor * 0.3
@@ -79,12 +81,14 @@ class AttendancePredictor:
             "patterns": patterns
         }
 
+#Прогнозирование бюджета
+
 class BudgetPredictor:
-    """Прогнозирование бюджета"""
-    
+       
     def __init__(self, daily_rate: float = 500.0):
         self.daily_rate = daily_rate
     
+    #Прогноз выручки за месяц
     def predict_monthly_revenue(
         self,
         group_id: int,
@@ -92,7 +96,7 @@ class BudgetPredictor:
         target_month: date,
         attendance_predictor: AttendancePredictor
     ) -> Dict:
-        """Прогноз выручки за месяц"""
+        
         from app.models import Child
         
         children = db.query(Child).filter(
@@ -128,17 +132,17 @@ class BudgetPredictor:
             "predictions": predictions,
             "confidence": round(sum(p["confidence"] for p in predictions) / len(predictions), 2) if predictions else 0
         }
-
+ 
+ #Анализ рисков
 class RiskAnalyzer:
-    """Анализ рисков"""
-    
+      
     def identify_at_risk_children(
         self,
         group_id: int,
         db: Session,
         attendance_predictor: AttendancePredictor
     ) -> List[Dict]:
-        """Выявление детей в группе риска"""
+        #Выявление детей в группе риска
         from app.models import Child
         
         children = db.query(Child).filter(

@@ -1,3 +1,5 @@
+#Конфигурация приложения
+
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -5,19 +7,19 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
     
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_PASSWORD_HASH_TTL: int = 86400  # 24 часа в секундах
+    
     # JWT
     SECRET_KEY: str
-    ALGORITHM: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int
-    
-    # Optional: отдельные поля для Docker (если нужно)
-    POSTGRES_USER: str | None = None
-    POSTGRES_PASSWORD: str | None = None
-    POSTGRES_DB: str | None = None
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     class Config:
         env_file = ".env"
-        extra = "ignore"  # ← ИГНОРИРОВАТЬ лишние поля из .env!
+        env_file_encoding = "utf-8"
+        extra = "ignore" 
 
 @lru_cache()
 def get_settings():
