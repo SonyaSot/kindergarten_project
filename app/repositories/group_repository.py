@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session
 from app.models import Group
 from app.repositories.base import BaseRepository
 
+#Репозиторий для работы с группами
 class GroupRepository(BaseRepository[Group]):
-    """Репозиторий для работы с группами"""
-    
+        
     def __init__(self, db: Session):
         super().__init__(Group, db)
     

@@ -8,13 +8,13 @@ from app.routers.auth import get_current_user_from_token
 
 router = APIRouter(prefix="/groups", tags=["Группы"])
 
-# === ПОЛУЧИТЬ МОИ ГРУППЫ (для воспитателя) ===
+# ПОЛУЧИТЬ МОИ ГРУППЫ 
 @router.get("/me", response_model=List[GroupResponse])
 async def get_my_groups(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить группы текущего пользователя (воспитатель видит только свои)"""
+   
     if current_user.role.value == "teacher":
         # Воспитатель видит только группы, где он teacher_id
         groups = db.query(Group).filter(Group.teacher_id == current_user.id).all()
@@ -23,14 +23,13 @@ async def get_my_groups(
         groups = db.query(Group).all()
     return groups
 
-# === СОЗДАНИЕ ГРУППЫ (Только админ) ===
+#  СОЗДАНИЕ ГРУППЫ 
 @router.post("/", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
 async def create_group(
     group_data: GroupCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Создать новую группу (только админ)"""
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Только администратор может создавать группы")
     
@@ -44,13 +43,12 @@ async def create_group(
     db.refresh(new_group)
     return new_group
 
-# === ПОЛУЧЕНИЕ ВСЕХ ГРУПП ===
+# ПОЛУЧЕНИЕ ВСЕХ ГРУПП 
 @router.get("/", response_model=List[GroupResponse])
 async def get_all_groups(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить все группы"""
     # Воспитатель видит только свои группы
     if current_user.role.value == "teacher":
         groups = db.query(Group).filter(Group.teacher_id == current_user.id).all()
@@ -58,14 +56,13 @@ async def get_all_groups(
         groups = db.query(Group).all()
     return groups
 
-# === ПОЛУЧЕНИЕ ОДНОЙ ГРУППЫ ===
+#  ПОЛУЧЕНИЕ ОДНОЙ ГРУППЫ 
 @router.get("/{group_id}", response_model=GroupResponse)
 async def get_group(
     group_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить группу по ID"""
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Группа не найдена")
@@ -76,7 +73,7 @@ async def get_group(
     
     return group
 
-# === ОБНОВЛЕНИЕ ГРУППЫ ===
+#  ОБНОВЛЕНИЕ ГРУППЫ 
 @router.put("/{group_id}", response_model=GroupResponse)
 async def update_group(
     group_id: int,
@@ -84,7 +81,6 @@ async def update_group(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Обновить группу (только админ)"""
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Только администратор может редактировать группы")
     
@@ -104,14 +100,13 @@ async def update_group(
     db.refresh(group)
     return group
 
-# === УДАЛЕНИЕ ГРУППЫ (Только админ) ===
+# УДАЛЕНИЕ ГРУППЫ 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(
     group_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Удалить группу (только админ)"""
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Только администратор может удалять группы")
     

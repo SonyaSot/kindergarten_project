@@ -1,6 +1,6 @@
-"""
-app/routers/audit.py - Эндпоинты для просмотра журнала действий
-"""
+
+# Эндпоинты для просмотра журнала действий
+
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -25,11 +25,7 @@ async def get_audit_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """
-    Получить журнал действий пользователей.
     
-    Доступ: Только администраторы
-    """
     # Проверка прав доступа
     if current_user.role not in ["admin"]:
         raise HTTPException(
@@ -76,11 +72,7 @@ async def get_audit_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """
-    Получить статистику по журналу действий.
-    
-    Доступ: Только администраторы
-    """
+   
     if current_user.role not in ["admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

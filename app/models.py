@@ -5,7 +5,7 @@ import enum
 from app.database import Base
 
 
-# === ENUMS ===
+
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
     TEACHER = "teacher"
@@ -17,26 +17,32 @@ class AttendanceStatus(str, enum.Enum):
     SICK = "sick"
     NOT_MARKED = "not_marked"
 
-# === МОДЕЛЬ: Пользователь ===
+#  Пользователь
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)  # ← Оставь как есть!
     full_name = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # ✅ НОВОЕ: группа для воспитателей
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
 
-    # Отношения (обрати внимание на back_populates)
+    # Отношения 
     groups_as_teacher = relationship("Group", foreign_keys="Group.teacher_id", back_populates="teacher")
     attendance_records = relationship("Attendance", back_populates="teacher")
+    
+    # ✅ НОВОЕ: связь с группой через group_id
+    group = relationship("Group", foreign_keys=[group_id])
 
     def __repr__(self):
         return f"<User {self.email} ({self.role})>"
 
-# === МОДЕЛЬ: Группа ===
+#  Группа 
 class Group(Base):
     __tablename__ = "groups"
 
@@ -53,7 +59,7 @@ class Group(Base):
     def __repr__(self):
         return f"<Group {self.name}>"
 
-# === МОДЕЛЬ: Ребенок ===
+#  Ребенок 
 class Child(Base):
     __tablename__ = "children"
 
@@ -76,7 +82,7 @@ class Child(Base):
     def __repr__(self):
         return f"<Child {self.full_name}>"
 
-# === МОДЕЛЬ: Посещаемость ===
+#  Посещаемость 
 class Attendance(Base):
     __tablename__ = "attendance"
 
@@ -89,14 +95,14 @@ class Attendance(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # ✅ Отношения
+    # Отношения
     child = relationship("Child", back_populates="attendance_records")
     teacher = relationship("User", back_populates="attendance_records")
 
     def __repr__(self):
         return f"<Attendance {self.child_id} - {self.date} - {self.status}>"
 
-# === МОДЕЛЬ: Оплата ===
+# Оплата 
 class Payment(Base):
     __tablename__ = "payments"
 
@@ -110,13 +116,13 @@ class Payment(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # ✅ Отношения
+    #  Отношения
     child = relationship("Child", back_populates="payments")
 
     def __repr__(self):
         return f"<Payment {self.child_id} - {self.month} - {self.amount}>"
 
- # === Журнал действий пользователей  ===
+ # Журнал действий пользователей  
 class AuditLog(Base):
    
     __tablename__ = "audit_logs"

@@ -30,7 +30,7 @@ class BulkAttendanceCreate(BaseModel):
 
 # Схема ответа (данные записи посещаемости)
 class AttendanceResponse(BaseModel):
-    # ✅ Единый стиль конфигурации для Pydantic v2
+
     model_config = ConfigDict(from_attributes=True)
     
     id: int
@@ -40,7 +40,7 @@ class AttendanceResponse(BaseModel):
     date: date  # Формат: YYYY-MM-DD (стандарт API)
     status: AttendanceStatusEnum
     comment: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
 # Схема для просмотра журнала группы за дату

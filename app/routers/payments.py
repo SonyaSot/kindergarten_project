@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import List, Optional
@@ -13,23 +13,22 @@ from app.schemas.payment import (
 )
 from app.routers.auth import get_current_user_from_token
 
+
 router = APIRouter(prefix="/payments", tags=["Бухгалтерия и отчеты"])
 
-# === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Проверка прав ===
+#  Проверка прав 
 async def check_accountant_or_admin(current_user: User):
-    """Проверяет, что пользователь - админ или бухгалтер"""
     if current_user.role.value not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Только администратор или бухгалтер могут управлять платежами")
     return current_user
 
-# === РАСЧЕТ СТОИМОСТИ НА ОСНОВЕ ПОСЕЩАЕМОСТИ ===
+#  РАСЧЕТ СТОИМОСТИ НА ОСНОВЕ ПОСЕЩАЕМОСТИ 
 def calculate_fee_based_on_attendance(
     child_id: int,
     month: date,
     db: Session,
     base_rate: float = 500.0
 ) -> float:
-    """Расчет суммы на основе дней присутствия"""
     month_start = month.replace(day=1)
     if month.month == 12:
         month_end = date(month.year + 1, 1, 1) - timedelta(days=1)
@@ -47,14 +46,14 @@ def calculate_fee_based_on_attendance(
     
     return present_days * base_rate
 
-# === СОЗДАНИЕ ПЛАТЕЖА ===
+# СОЗДАНИЕ ПЛАТЕЖА 
 @router.post("/", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment(
     payment_data: PaymentCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Создать новый платеж (админ или бухгалтер)"""
+
     await check_accountant_or_admin(current_user)
     
     child = db.query(Child).filter(Child.id == payment_data.child_id).first()
@@ -99,14 +98,13 @@ async def create_payment(
         updated_at=new_payment.updated_at
     )
 
-# === АВТОМАТИЧЕСКИЙ РАСЧЕТ ПЛАТЕЖЕЙ ===
+#  АВТОМАТИЧЕСКИЙ РАСЧЕТ ПЛАТЕЖЕЙ 
 @router.post("/auto-calculate/{target_month}", response_model=List[PaymentResponse])
 async def auto_calculate_payments(
     target_month: date,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Автоматический расчет платежей на основе посещаемости"""
     await check_accountant_or_admin(current_user)
     
     children = db.query(Child).filter(Child.is_active == True).all()
@@ -155,7 +153,7 @@ async def auto_calculate_payments(
     
     return results
 
-# === ПОЛУЧЕНИЕ ПЛАТЕЖЕЙ РЕБЕНКА ===
+#  ПОЛУЧЕНИЕ ПЛАТЕЖЕЙ РЕБЕНКА 
 @router.get("/child/{child_id}", response_model=List[PaymentResponse])
 async def get_child_payments(
     child_id: int,
@@ -164,7 +162,7 @@ async def get_child_payments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить историю платежей ребенка"""
+
     child = db.query(Child).filter(Child.id == child_id).first()
     if not child:
         raise HTTPException(status_code=404, detail="Ребенок не найден")
@@ -199,7 +197,7 @@ async def get_child_payments(
         for p in payments
     ]
 
-# === ОТЧЕТ ПО ГРУППЕ ===
+#  финансовый ОТЧЕТ ПО ГРУППЕ 
 @router.get("/report/group/{group_id}", response_model=PaymentReportResponse)
 async def get_group_payment_report(
     group_id: int,
@@ -207,7 +205,6 @@ async def get_group_payment_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить финансовый отчет по группе за месяц"""
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Группа не найдена")
@@ -267,7 +264,7 @@ async def get_group_payment_report(
         payments=payment_responses
     )
 
-# === ОБНОВЛЕНИЕ ПЛАТЕЖА ===
+#  ОБНОВЛЕНИЕ ПЛАТЕЖА 
 @router.put("/{payment_id}", response_model=PaymentResponse)
 async def update_payment(
     payment_id: int,
@@ -275,7 +272,6 @@ async def update_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Обновить платеж (админ или бухгалтер)"""
     await check_accountant_or_admin(current_user)
     
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
@@ -311,14 +307,13 @@ async def update_payment(
         updated_at=payment.updated_at
     )
 
-# === УДАЛЕНИЕ ПЛАТЕЖА ===
+#  УДАЛЕНИЕ ПЛАТЕЖА 
 @router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_payment(
     payment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Удалить платеж (только админ)"""
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Только администратор может удалять платежи")
     
@@ -329,3 +324,5 @@ async def delete_payment(
     db.delete(payment)
     db.commit()
     return None
+
+

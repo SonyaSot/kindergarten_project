@@ -45,12 +45,18 @@ async def create_child(
 async def get_children(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
-):    
+):
     service = ChildService(db)
     
-    # Админ видит всех детей, остальные — только свою группу
-    if current_user.role == UserRole.ADMIN:
+    # Админ/бухгалтер видит всех
+    if current_user.role.value in ["admin", "accountant"]:
         return service.get_all_children()
-    else:
-        # Для учителя/бухгалтера — только их группа
+    
+    # Учитель видит только свою группу
+    elif current_user.role.value == "teacher":
+        if not current_user.group_id:
+            raise HTTPException(status_code=403, detail="Учитель не привязан к группе")
         return service.get_children_by_group(current_user.group_id)
+    
+    else:
+        raise HTTPException(status_code=403, detail="Нет доступа")

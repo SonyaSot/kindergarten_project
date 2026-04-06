@@ -16,13 +16,13 @@ from app.routers.auth import get_current_user_from_token
 
 router = APIRouter(prefix="/attendance", tags=["Электронный журнал"])
 
-# === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Проверка прав ===
+#  Проверка прав 
 async def check_teacher_access_to_group(
     group_id: int,
     current_user: User,
     db: Session
 ):
-    """Проверяет, имеет ли пользователь доступ к группе"""
+
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Группа не найдена")
@@ -38,7 +38,7 @@ async def check_teacher_access_to_group(
     
     return group
 
-# === ПОЛУЧЕНИЕ ЖУРНАЛА ГРУППЫ ЗА ДАТУ ===
+#  ПОЛУЧЕНИЕ ЖУРНАЛА ГРУППЫ ЗА ДАТУ
 @router.get("/group/{group_id}/date/{target_date}", response_model=DailyJournalResponse)
 async def get_daily_journal(
     group_id: int,
@@ -46,7 +46,7 @@ async def get_daily_journal(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить журнал посещаемости группы за конкретную дату"""
+    
     # Проверка доступа
     group = await check_teacher_access_to_group(group_id, current_user, db)
     
@@ -116,14 +116,14 @@ async def get_daily_journal(
         unmarked_count=unmarked_count
     )
 
-# === СОЗДАНИЕ/ОБНОВЛЕНИЕ ЗАПИСИ ПОСЕЩАЕМОСТИ ===
+# СОЗДАНИЕ/ОБНОВЛЕНИЕ ЗАПИСИ ПОСЕЩАЕМОСТИ 
 @router.post("/", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 async def create_attendance(
     attendance_data: AttendanceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Создать или обновить запись посещаемости"""
+
     # Проверка доступа к группе ребенка
     child = db.query(Child).filter(Child.id == attendance_data.child_id).first()
     if not child:
@@ -181,14 +181,14 @@ async def create_attendance(
             updated_at=new_attendance.updated_at
         )
 
-# === МАССОВАЯ ОТМЕТКА ПОСЕЩАЕМОСТИ ===
+#  МАССОВАЯ ОТМЕТКА ПОСЕЩАЕМОСТИ 
 @router.post("/bulk", response_model=List[AttendanceResponse])
 async def bulk_mark_attendance(
     bulk_data: BulkAttendanceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Массовая отметка посещаемости для всей группы"""
+    
     # Проверка доступа
     group = await check_teacher_access_to_group(bulk_data.group_id, current_user, db)
     
@@ -253,7 +253,7 @@ async def bulk_mark_attendance(
     
     return results
 
-# === ОБНОВЛЕНИЕ ЗАПИСИ ПОСЕЩАЕМОСТИ ===
+#  ОБНОВЛЕНИЕ ЗАПИСИ ПОСЕЩАЕМОСТИ 
 @router.put("/{attendance_id}", response_model=AttendanceResponse)
 async def update_attendance(
     attendance_id: int,
@@ -261,7 +261,7 @@ async def update_attendance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Обновить запись посещаемости"""
+    
     record = db.query(Attendance).filter(Attendance.id == attendance_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Запись не найдена")
@@ -294,7 +294,7 @@ async def update_attendance(
         updated_at=record.updated_at
     )
 
-# === ПОЛУЧЕНИЕ ИСТОРИИ ПОСЕЩАЕМОСТИ РЕБЕНКА ===
+#  ПОЛУЧЕНИЕ ИСТОРИИ ПОСЕЩАЕМОСТИ РЕБЕНКА 
 @router.get("/child/{child_id}/history", response_model=List[AttendanceResponse])
 async def get_child_attendance_history(
     child_id: int,
@@ -303,7 +303,7 @@ async def get_child_attendance_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Получить историю посещаемости ребенка"""
+    
     child = db.query(Child).filter(Child.id == child_id).first()
     if not child:
         raise HTTPException(status_code=404, detail="Ребенок не найден")
@@ -337,14 +337,14 @@ async def get_child_attendance_history(
         for r in records
     ]
 
-# === УДАЛЕНИЕ ЗАПИСИ ПОСЕЩАЕМОСТИ (Только админ) ===
+# УДАЛЕНИЕ ЗАПИСИ ПОСЕЩАЕМОСТИ 
 @router.delete("/{attendance_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_attendance(
     attendance_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_from_token)
 ):
-    """Удалить запись посещаемости (только админ)"""
+    
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Только администратор может удалять записи посещаемости")
     

@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session
 from app.models import User
 from app.repositories.base import BaseRepository
 
+#Репозиторий для работы с пользователями
 class UserRepository(BaseRepository[User]):
-    """Репозиторий для работы с пользователями"""
-    
+        
     def __init__(self, db: Session):
         super().__init__(User, db)
     

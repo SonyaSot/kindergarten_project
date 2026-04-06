@@ -3,9 +3,9 @@ from typing import Generic, TypeVar, Type, Optional, List
 
 ModelType = TypeVar("ModelType")
 
+#Базовый репозиторий
 class BaseRepository(Generic[ModelType]):
-    """Базовый репозиторий - паттерн Repository"""
-    
+         
     def __init__(self, model: Type[ModelType], db: Session):
         self.model = model
         self.db = db

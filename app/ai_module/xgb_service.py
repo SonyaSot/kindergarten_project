@@ -1,6 +1,6 @@
 """
 app/ai_module/xgb_service.py - ИИ прогноз посещаемости на XGBoost
-Без кэширования - просто и надёжно
+ИСПРАВЛЕННАЯ ВЕРСИЯ: конвертация numpy типов для совместимости с FastAPI
 """
 
 import pandas as pd
@@ -19,30 +19,39 @@ class XGBPredictor:
         self.model = None
     
     def prepare_data(self) -> pd.DataFrame:
-        """Подготовить данные для обучения"""
+        """Подготовить данные: один пример = один день для одной группы"""
         records = self.db.query(Attendance).join(Child).filter(
             Attendance.date >= date.today() - timedelta(days=365),
             Attendance.status != AttendanceStatus.NOT_MARKED
         ).all()
         
-        data = []
+        from collections import defaultdict
+        grouped = defaultdict(lambda: {"present": 0, "total": 0})
+        
         for r in records:
+            key = (r.date, r.child.group_id)
+            grouped[key]["total"] += 1
+            if r.status == AttendanceStatus.PRESENT:
+                grouped[key]["present"] += 1
+        
+        data = []
+        for (date_, group_id), counts in grouped.items():
+            if counts["total"] == 0:
+                continue
+            rate = counts["present"] / counts["total"]
             features = {
-                "weekday": r.date.weekday(),
-                "month": r.date.month,
-                "is_monday": 1 if r.date.weekday() == 0 else 0,
-                "is_friday": 1 if r.date.weekday() == 4 else 0,
-                "is_winter": 1 if r.date.month in [12, 1, 2] else 0,
-                "child_age": self._calculate_age(r.child.date_of_birth, r.date),
-                "group_id": r.child.group_id,
-                "target": 1 if r.status == AttendanceStatus.PRESENT else 0
+                "weekday": int(date_.weekday()),
+                "month": int(date_.month),
+                "is_monday": 1 if date_.weekday() == 0 else 0,
+                "is_friday": 1 if date_.weekday() == 4 else 0,
+                "is_winter": 1 if date_.month in [12, 1, 2] else 0,
+                "is_weekend": 1 if date_.weekday() >= 5 else 0,
+                "group_id": int(group_id),
+                "target": float(rate)
             }
             data.append(features)
         
         return pd.DataFrame(data)
-    
-    def _calculate_age(self, dob: date, at_date: date) -> int:
-        return at_date.year - dob.year - ((at_date.month, at_date.day) < (dob.month, dob.day))
     
     def train_model(self) -> bool:
         """Обучить модель"""
@@ -56,25 +65,24 @@ class XGBPredictor:
         X = df.drop("target", axis=1)
         y = df["target"]
         
-        self.model = xgb.XGBClassifier(
+        self.model = xgb.XGBRegressor(
             n_estimators=100,
             max_depth=4,
             learning_rate=0.1,
-            random_state=42,
-            eval_metric='logloss'
+            random_state=42
         )
         
         self.model.fit(X, y)
         
         os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
         self.model.save_model(MODEL_PATH)
-        print(f" Модель сохранена")
+        print("Модель сохранена")
         return True
     
     def load_model(self) -> bool:
         """Загрузить модель"""
         if os.path.exists(MODEL_PATH):
-            self.model = xgb.XGBClassifier()
+            self.model = xgb.XGBRegressor()
             self.model.load_model(MODEL_PATH)
             return True
         return False
@@ -93,38 +101,48 @@ class XGBPredictor:
             Child.group_id == group_id,
             Child.is_active == True
         ).all()
+        total_children = len(children)
         
-        if not children:
+        if total_children == 0:
             return {"error": "Нет активных детей"}
         
-        X_pred = []
-        for child in children:
-            features = {
-                "weekday": target_date.weekday(),
-                "month": target_date.month,
-                "is_monday": 1 if target_date.weekday() == 0 else 0,
-                "is_friday": 1 if target_date.weekday() == 4 else 0,
-                "is_winter": 1 if target_date.month in [12, 1, 2] else 0,
-                "child_age": self._calculate_age(child.date_of_birth, target_date),
-                "group_id": child.group_id
-            }
-            X_pred.append(features)
+        features = {
+            "weekday": int(target_date.weekday()),
+            "month": int(target_date.month),
+            "is_monday": 1 if target_date.weekday() == 0 else 0,
+            "is_friday": 1 if target_date.weekday() == 4 else 0,
+            "is_winter": 1 if target_date.month in [12, 1, 2] else 0,
+            "is_weekend": 1 if target_date.weekday() >= 5 else 0,
+            "group_id": int(group_id)
+        }
         
-        X_df = pd.DataFrame(X_pred)
-        predictions = self.model.predict(X_df)
+        X_pred = pd.DataFrame([features])
         
-        expected_count = int(sum(predictions))
-        total = len(children)
-        rate = (expected_count / total * 100) if total > 0 else 0
+        # Предсказываем и конвертируем numpy.float32 → float
+        predicted_rate = float(self.model.predict(X_pred)[0])
         
-        risk = "low" if rate >= 85 else "medium" if rate >= 70 else "high"
+        # Ограничиваем диапазон
+        predicted_rate = max(0.0, min(1.0, predicted_rate))
         
+        # Считаем ожидаемое количество детей (конвертируем в int)
+        expected_count = int(round(predicted_rate * total_children))
+        rate_percent = round(float(predicted_rate * 100), 2)
+        
+        # Определяем уровень риска
+        if rate_percent >= 85:
+            risk = "low"
+        elif rate_percent >= 70:
+            risk = "medium"
+        else:
+            risk = "high"
+        
+        # ВОЗВРАЩАЕМ ТОЛЬКО PYTHON-ТИПЫ (не numpy!)
         return {
-            "group_id": group_id,
-            "prediction_date": target_date.isoformat(),
-            "expected_attendance": expected_count,
-            "total_children": total,
-            "attendance_rate": round(rate, 2),
-            "risk_level": risk,
-            "model_type": "XGBoost Classifier"
+            "group_id": int(group_id),
+            "prediction_date": str(target_date.isoformat()),
+            "expected_attendance": int(expected_count),
+            "total_children": int(total_children),
+            "attendance_rate": float(rate_percent),
+            "risk_level": str(risk),
+            "model_type": str("XGBoost Regressor")
         }

@@ -4,8 +4,8 @@ from typing import Optional
 
 # Схема для создания группы
 class GroupCreate(BaseModel):
-    name: str  # Название группы (например, "Солнышко")
-    age_range: Optional[str] = None  # Возрастной диапазон (например, "3-4 года")
+    name: str  # Название группы 
+    age_range: Optional[str] = None  # Возрастной диапазон 
     teacher_id: Optional[int] = None  # ID воспитателя
 
 # Схема для обновления группы
