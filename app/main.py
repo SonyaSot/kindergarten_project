@@ -12,6 +12,11 @@ from app.routers.payments import router as payments_router
 from app.routers import ai_predictions  
 from app.routers import audit
 
+# ✅ ДОБАВЬ ЭТУ СТРОКУ:
+from app.routers import users
+
+from app.middleware.audit import AuditMiddleware
+
 # Создаём таблицы в базе данных
 try:
     Base.metadata.create_all(bind=engine)
@@ -21,6 +26,8 @@ except Exception as e:
 
 app = FastAPI(title="Детский сад - Учет посещаемости")
 
+app.add_middleware(AuditMiddleware)
+
 # Подключаем роутеры
 app.include_router(auth_router)
 app.include_router(groups_router)
@@ -29,6 +36,9 @@ app.include_router(attendance_router)
 app.include_router(payments_router)
 app.include_router(ai_predictions.router) 
 app.include_router(audit.router, tags=["Журнал действий"])
+
+# ✅ ДОБАВЬ ЭТУ СТРОКУ:
+app.include_router(users.router, tags=["Пользователи"])
 
 @app.get("/")
 async def root():

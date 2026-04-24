@@ -11,6 +11,7 @@ from datetime import datetime, date
 from app.database import get_db
 from app.models import User, AuditLog
 from app.routers.auth import get_current_user_from_token
+from app.models import UserRole
 
 router = APIRouter(prefix="/audit", tags=["Журнал действий"])
 
@@ -27,7 +28,7 @@ async def get_audit_logs(
 ):
     
     # Проверка прав доступа
-    if current_user.role not in ["admin"]:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы могут просматривать журнал аудита"
@@ -73,7 +74,7 @@ async def get_audit_stats(
     current_user: User = Depends(get_current_user_from_token)
 ):
    
-    if current_user.role not in ["admin"]:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы"

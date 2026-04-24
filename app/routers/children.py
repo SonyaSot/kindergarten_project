@@ -26,7 +26,7 @@ async def create_child(
         )
     
     service = ChildService(db)
-    new_child = service.create_child(child_data)
+    new_child = service.create_child(child)
     
     log_action(
         db=db,

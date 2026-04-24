@@ -6,10 +6,10 @@ from app.database import Base
 
 
 
-class UserRole(str, enum.Enum):
-    ADMIN = "admin"
-    TEACHER = "teacher"
-    ACCOUNTANT = "accountant"
+class UserRole(enum.Enum):
+    ADMIN = "ADMIN"
+    TEACHER = "TEACHER"
+    ACCOUNTANT = "ACCOUNTANT"
 
 class AttendanceStatus(str, enum.Enum):
     PRESENT = "present"
@@ -18,25 +18,27 @@ class AttendanceStatus(str, enum.Enum):
     NOT_MARKED = "not_marked"
 
 #  Пользователь
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)  # ← Оставь как есть!
+    hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # ✅ НОВОЕ: группа для воспитателей
+    # ✅ ДОБАВЬ ЭТУ СТРОКУ:
+    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    
+    # Группа для воспитателей
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
 
     # Отношения 
     groups_as_teacher = relationship("Group", foreign_keys="Group.teacher_id", back_populates="teacher")
     attendance_records = relationship("Attendance", back_populates="teacher")
-    
-    # ✅ НОВОЕ: связь с группой через group_id
     group = relationship("Group", foreign_keys=[group_id])
 
     def __repr__(self):
