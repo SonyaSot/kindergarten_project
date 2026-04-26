@@ -4,7 +4,7 @@ from sqlalchemy import and_
 from typing import List, Optional
 from datetime import date, datetime
 from app.database import get_db
-from app.models import Attendance, Child, Group, User, AttendanceStatus
+from app.models import User, UserRole, Group, Child, Attendance, AttendanceStatus
 from app.schemas.attendance import (
     AttendanceCreate, 
     AttendanceUpdate, 
@@ -14,29 +14,32 @@ from app.schemas.attendance import (
 )
 from app.routers.auth import get_current_user_from_token
 
+
 router = APIRouter(prefix="/attendance", tags=["Электронный журнал"])
 
-#  Проверка прав 
 async def check_teacher_access_to_group(
     group_id: int,
     current_user: User,
     db: Session
 ):
-
+    """Проверка доступа учителя к группе"""
+    
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Группа не найдена")
     
-    # Воспитатель видит только свои группы
-    if current_user.role.value == "teacher":
+    # ADMIN и ACCOUNTANT имеют доступ ко всем группам
+    if current_user.role in [UserRole.ADMIN, UserRole.ACCOUNTANT]:
+        return group
+    
+    # TEACHER имеет доступ ТОЛЬКО к своим группам
+    if current_user.role == UserRole.TEACHER:
         if group.teacher_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
+        return group
     
-    # Бухгалтер не может редактировать журнал
-    if current_user.role.value == "accountant":
-        raise HTTPException(status_code=403, detail="Бухгалтер не может редактировать журнал посещаемости")
-    
-    return group
+    # Другие роли (если появятся) - запрещаем
+    raise HTTPException(status_code=403, detail="Недостаточно прав")
 
 #  ПОЛУЧЕНИЕ ЖУРНАЛА ГРУППЫ ЗА ДАТУ
 @router.get("/group/{group_id}/date/{target_date}", response_model=DailyJournalResponse)
@@ -355,3 +358,60 @@ async def delete_attendance(
     db.delete(record)
     db.commit()
     return None
+# Добавьте в конец файла app/routers/attendance.py:
+
+@router.get("/stats/group/{group_id}")
+async def get_attendance_stats(
+    group_id: int,
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token)
+):
+    """Получить статистику посещаемости для группы за месяц"""
+    
+    # Проверка доступа
+    await check_teacher_access_to_group(group_id, current_user, db)
+    
+    # Получаем детей группы
+    children = db.query(Child).filter(
+        Child.group_id == group_id,
+        Child.is_active == True
+    ).all()
+    
+    total_children = len(children)
+    
+    # Получаем записи за месяц
+    start_date = date(year, month, 1)
+    if month == 12:
+        end_date = date(year + 1, 1, 1)
+    else:
+        end_date = date(year, month + 1, 1)
+    
+    records = db.query(Attendance).filter(
+        Attendance.child_id.in_([c.id for c in children]),
+        Attendance.date >= start_date,
+        Attendance.date < end_date
+    ).all()
+    
+    # Статистика по дням
+    from collections import defaultdict
+    by_day = defaultdict(lambda: {"present": 0, "total": total_children})
+    
+    present_count = 0
+    for record in records:
+        day = record.date.day
+        if record.status == AttendanceStatus.PRESENT:
+            by_day[day]["present"] += 1
+            present_count += 1
+    
+    total_possible = total_children * len(by_day)
+    attendance_rate = (present_count / total_possible * 100) if total_possible > 0 else 0
+    
+    return {
+        "total_children": total_children,
+        "total_present": present_count,
+        "total_days": len(by_day),
+        "attendance_rate": round(attendance_rate, 1),
+        "by_day": dict(by_day)
+    }
