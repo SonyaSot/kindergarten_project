@@ -11,32 +11,18 @@ from typing import Optional
 
 # ✅ ВАЖНО: Роль должна совпадать с БД (заглавные буквы!)
 class UserRole(str, Enum):
-    ADMIN = "ADMIN"        # ← Заглавные, как в models.py!
-    TEACHER = "TEACHER"
-    ACCOUNTANT = "ACCOUNTANT"
-    
+    ADMIN = "admin"
+    TEACHER = "teacher"
+    ACCOUNTANT = "accountant"
     
 
 
 # Данные для регистрации
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str
     full_name: str
     role: UserRole = UserRole.TEACHER
-    group_id: Optional[int] = None
-    is_active: bool = True
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "email": "newuser@sadik.ru",
-                "password": "secure123",
-                "full_name": "Новый Пользователь",
-                "role": "TEACHER",
-                "group_id": 1
-            }
-        }
 
 
 # Данные для входа

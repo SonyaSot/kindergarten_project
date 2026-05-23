@@ -324,5 +324,3 @@ async def delete_payment(
     db.delete(payment)
     db.commit()
     return None
-
-
