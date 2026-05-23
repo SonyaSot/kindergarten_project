@@ -1,4 +1,3 @@
-
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 from passlib.context import CryptContext
@@ -186,7 +185,7 @@ try:
                     "pemail": parent_email
                 })
                 cid = result.scalar()
-                print(f"      👶 Добавлен: {child_full_name} ({'мальчик' if is_boy else 'девочка'})")
+                print(f"       Добавлен: {child_full_name} ({'мальчик' if is_boy else 'девочка'})")
             
             if cid:
                 child_ids.append(cid)
@@ -242,6 +241,6 @@ try:
     
 except Exception as e:
     session.rollback()
-    print(f"\n❌ ОШИБКА: {e}")
+    print(f"\n ОШИБКА: {e}")
 finally:
     session.close()

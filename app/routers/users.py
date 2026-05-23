@@ -3,17 +3,17 @@ app/routers/users.py
 Управление пользователями (только для админа)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 
 from app.database import get_db
-from app.models import User, UserRole  # ← UserRole из models!
+from app.models import User, UserRole, Group
 from app.routers.auth import get_current_user_from_token 
 from app.utils.security import get_password_hash 
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
-from app.utils.audit import log_action  # ← Импортируй функцию!
+from app.utils.audit import log_action
 
 router = APIRouter(prefix="/users", tags=["Пользователи"])
 
@@ -32,17 +32,14 @@ async def get_all_users(
 ):
     """Получить список всех пользователей (только админ)"""
     
-    # Проверка прав
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Только администраторы могут управлять пользователями"
         )
     
-    # Формируем запрос
     query = db.query(User)
     
-    # Фильтр по роли
     if role:
         try:
             role_enum = UserRole[role.upper()]
@@ -53,10 +50,121 @@ async def get_all_users(
                 detail=f"Неверная роль. Допустимые: {[r.name for r in UserRole]}"
             )
     
-    # Пагинация
     users = query.offset(skip).limit(limit).all()
     
     return users
+
+
+# ============================================
+# ПОЛУЧИТЬ НЕАКТИВНЫХ ПОЛЬЗОВАТЕЛЕЙ (ЗАЯВКИ)
+# ============================================
+
+@router.get("/pending", response_model=List[UserResponse])
+async def get_pending_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token)
+):
+    """Получить список пользователей, ожидающих подтверждения (только админ)"""
+    
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только администраторы могут просматривать заявки"
+        )
+    
+    users = db.query(User).filter(User.is_active == False).all()
+    return users
+
+
+# ============================================
+# ПОДТВЕРДИТЬ ЗАЯВКУ (активировать)
+# ============================================
+
+@router.put("/{user_id}/approve", response_model=UserResponse)
+async def approve_user(
+    user_id: int,
+    group_id: Optional[int] = Query(None, description="ID группы для учителя"),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token)
+):
+    """Подтвердить заявку - активировать пользователя (только админ)"""
+    
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только администраторы могут подтверждать заявки"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    if user.is_active:
+        raise HTTPException(status_code=400, detail="Пользователь уже активирован")
+    
+    user.is_active = True
+    
+    # Если это учитель - назначаем группу
+    if user.role == UserRole.TEACHER and group_id:
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Группа не найдена")
+        group.teacher_id = user.id
+    
+    db.commit()
+    db.refresh(user)
+    
+    log_action(
+        db=db,
+        user_id=current_user.id,
+        action="APPROVE",
+        resource="users",
+        resource_id=user.id,
+        details=f"Активирован пользователь: {user.email}, роль: {user.role.value}",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return user
+
+
+# ============================================
+# ОТКЛОНИТЬ ЗАЯВКУ (удалить)
+# ============================================
+
+@router.delete("/{user_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+async def reject_user(
+    user_id: int,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token)
+):
+    """Отклонить заявку - удалить пользователя (только админ)"""
+    
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только администраторы могут отклонять заявки"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    log_action(
+        db=db,
+        user_id=current_user.id,
+        action="REJECT",
+        resource="users",
+        resource_id=user.id,
+        details=f"Отклонена заявка пользователя: {user.email}",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    db.delete(user)
+    db.commit()
+    
+    return None
 
 
 # ============================================
@@ -107,7 +215,6 @@ async def update_user(
             detail="Только администраторы могут редактировать пользователей"
         )
     
-    # Найти пользователя
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -115,21 +222,17 @@ async def update_user(
             detail="Пользователь не найден"
         )
     
-    # Нельзя удалить самого себя
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Нельзя изменить свои данные через этот эндпоинт"
         )
     
-    # Обновляем поля
     update_data = user_update.dict(exclude_unset=True)
     
-    # Если меняем пароль — хэшируем
     if "password" in update_data and update_data["password"]:
-        update_data["hashed_password"] = get_hash_password(update_data.pop("password"))
+        update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
     
-    # Если меняем роль — валидируем
     if "role" in update_data and update_data["role"]:
         try:
             update_data["role"] = UserRole[update_data["role"].upper()]
@@ -139,7 +242,6 @@ async def update_user(
                 detail=f"Неверная роль. Допустимые: {[r.name for r in UserRole]}"
             )
     
-    # Применяем обновления
     for field, value in update_data.items():
         if hasattr(user, field):
             setattr(user, field, value)
@@ -148,8 +250,6 @@ async def update_user(
     db.commit()
     db.refresh(user)
     
-    # Аудит
-    from app.utils.audit import log_action
     log_action(
         db=db,
         user_id=current_user.id,
@@ -182,14 +282,12 @@ async def delete_user(
             detail="Только администраторы могут удалять пользователей"
         )
     
-    # Нельзя удалить самого себя
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Нельзя удалить самого себя"
         )
     
-    # Найти пользователя
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -197,16 +295,12 @@ async def delete_user(
             detail="Пользователь не найден"
         )
     
-    # Сохраняем данные для аудита перед удалением
     user_email = user.email
     user_role = user.role
     
-    # Удаляем (CASCADE удалит связанные записи)
     db.delete(user)
     db.commit()
     
-    # Аудит
-    from app.utils.audit import log_action
     log_action(
         db=db,
         user_id=current_user.id,
@@ -217,4 +311,48 @@ async def delete_user(
         ip_address=request.client.host if request.client else None
     )
     
-    return None  # 204 No Content
+    return None
+
+
+# ============================================
+# НАЗНАЧИТЬ ГРУППУ УЧИТЕЛЮ
+# ============================================
+
+@router.put("/{user_id}/assign-group")
+async def assign_group_to_teacher(
+    user_id: int,
+    group_id: int,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_token)
+):
+    """Назначить группу учителю (только админ)"""
+    
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Только администратор")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    if user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=400, detail="Пользователь не является учителем")
+    
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Группа не найдена")
+    
+    group.teacher_id = user.id
+    db.commit()
+    
+    log_action(
+        db=db,
+        user_id=current_user.id,
+        action="ASSIGN_GROUP",
+        resource="groups",
+        resource_id=group.id,
+        details=f"Учителю {user.email} назначена группа {group.name}",
+        ip_address=request.client.host if request.client else None
+    )
+    
+    return {"message": f"Группа '{group.name}' назначена учителю {user.full_name}"}

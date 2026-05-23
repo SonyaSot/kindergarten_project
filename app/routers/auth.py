@@ -25,19 +25,21 @@ async def register(
     user_: UserCreate,
     db: Session = Depends(get_db)
 ):
-    """Регистрация нового пользователя"""
+    """Регистрация нового пользователя (требует подтверждения админом)"""
+    
     existing_user = db.query(User).filter(User.email == user_.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
     
     hashed_password = get_password_hash(user_.password)
     
+    # Создаем с указанной ролью, но НЕ АКТИВНЫМ (ждет подтверждения)
     new_user = User(
         email=user_.email,
         hashed_password=hashed_password,
         full_name=user_.full_name,
         role=user_.role,
-        is_active=True
+        is_active=False  # ← Ждет подтверждения, не может войти!
     )
     db.add(new_user)
     db.commit()
@@ -57,8 +59,12 @@ async def login(
     if not user:
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     
+    # Проверка на активность
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Пользователь деактивирован")
+        raise HTTPException(
+            status_code=403, 
+            detail="Ваша заявка еще не подтверждена администратором"
+        )
     
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role.value},

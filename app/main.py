@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.database import engine, Base
 from app.models import User, Group, Child, Attendance, Payment
+from fastapi.middleware.cors import CORSMiddleware 
 
 
 # Импортируем роутеры НАПРЯМУЮ из файлов (обходим __init__.py)
@@ -15,8 +16,6 @@ from app.routers import audit
 # ✅ ДОБАВЬ ЭТУ СТРОКУ:
 from app.routers import users
 
-from app.middleware.audit import AuditMiddleware
-
 # Создаём таблицы в базе данных
 try:
     Base.metadata.create_all(bind=engine)
@@ -26,8 +25,16 @@ except Exception as e:
 
 app = FastAPI(title="Детский сад - Учет посещаемости")
 
-app.add_middleware(AuditMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ⚠️ Для разработки. В продакшене укажите ["http://localhost:5500", "http://127.0.0.1:5500"]
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешаем все методы: GET, POST, PUT, DELETE
+    allow_headers=["*"],  # Разрешаем все заголовки
+)
 
+# 2. Audit Middleware (если он совместим с FastAPI)
+# app.add_middleware(AuditMiddleware)  # ← раскомментируйте, если нужно
 # Подключаем роутеры
 app.include_router(auth_router)
 app.include_router(groups_router)
