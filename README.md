@@ -18,7 +18,7 @@
 
 ##  Быстрый старт
 
-### Вариант 1: Через Docker (рекомендуется) 
+### Вариант 1: Через Docker
 
 ```bash
 # 1. Клонировать репозиторий
@@ -34,9 +34,10 @@ docker-compose up --build
 
 # 4. Открыть Swagger документацию
 http://127.0.0.1:8000/docs
+```
 
-## Локальный запуск 
-
+### Локальный запуск 
+```bash
 # 1. Создать виртуальное окружение
 python -m venv venv
 venv\Scripts\activate  # Windows
@@ -52,10 +53,10 @@ uvicorn app.main:app --reload
 
 # 5. Открыть Swagger
 http://127.0.0.1:8000/docs
-
+```
 
 ## Docker команды
-
+```bash
 # Запуск системы
 docker-compose up --build
 
