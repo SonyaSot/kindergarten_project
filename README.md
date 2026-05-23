@@ -77,5 +77,8 @@ docker-compose exec db psql -U postgres -d kindergarten_db
 # Сделать бэкап БД
 docker-compose exec db pg_dump -U postgres -d kindergarten_db > backup.sql
 
+```
+
 ## Как запустить скрипт с данными:
-docker-compose exec app python scripts/seed_data.py
+```bash
+# docker-compose exec app python scripts/seed_data.py
